@@ -1,0 +1,6 @@
+{
+  "name": "ApexWire",
+  "description": "Independent, meticulously tested affiliate product reviews, editorial verdicts, and vetted deals across premium tech and gear.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
