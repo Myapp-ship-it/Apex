@@ -91,12 +91,25 @@ export const saveCustomSupabaseKeys = (url: string, anonKey: string) => {
   }
 };
 
+// List of authorized admin emails (both Oyajnabo@gmail.com and 0yyajnabe@gmail.com, plus env override)
+export const AUTHORIZED_ADMIN_EMAILS = [
+  (getEnvVar('VITE_ADMIN_EMAIL') || '').toLowerCase().trim(),
+  'oyajnabo@gmail.com',
+  '0yyajnabe@gmail.com'
+].filter(Boolean);
+
+export const isAuthorizedAdmin = (email?: string | null): boolean => {
+  if (!email) return false;
+  const normalized = email.toLowerCase().trim();
+  return AUTHORIZED_ADMIN_EMAILS.includes(normalized);
+};
+
 export const getAuthToken = async (): Promise<string | null> => {
   const sb = getSupabaseClient();
   if (sb) {
     try {
       const { data: { session } } = await sb.auth.getSession();
-      if (session?.access_token) {
+      if (session?.access_token && isAuthorizedAdmin(session.user?.email)) {
         return session.access_token;
       }
     } catch (err) {
@@ -104,8 +117,12 @@ export const getAuthToken = async (): Promise<string | null> => {
     }
   }
 
+  // Only return stored token if an active authorized admin email matches
   if (typeof window !== 'undefined') {
-    return localStorage.getItem('apexwire_admin_token');
+    const savedEmail = localStorage.getItem('apexwire_admin_email');
+    if (isAuthorizedAdmin(savedEmail)) {
+      return localStorage.getItem('apexwire_admin_token');
+    }
   }
   return null;
 };
@@ -139,6 +156,14 @@ export const performAdminLogin = async (
   const cleanEmail = email.trim();
   const cleanPass = pass.trim();
 
+  // Pre-validate admin authorization by email
+  if (!isAuthorizedAdmin(cleanEmail)) {
+    return {
+      success: false,
+      error: `Access Blocked: Account "${cleanEmail}" does not have administrator privileges. Access is strictly restricted to authorized administrators.`
+    };
+  }
+
   // 1. Try client-side Supabase client if available
   const sb = getSupabaseClient();
   if (sb) {
@@ -149,8 +174,19 @@ export const performAdminLogin = async (
       });
 
       if (!error && data.session && data.user) {
+        const userEmail = data.user.email || cleanEmail;
+        if (!isAuthorizedAdmin(userEmail)) {
+          await sb.auth.signOut();
+          localStorage.removeItem('apexwire_admin_token');
+          localStorage.removeItem('apexwire_admin_email');
+          return {
+            success: false,
+            error: `Access Blocked: Account "${userEmail}" is not authorized. Access is strictly restricted to authorized administrators.`
+          };
+        }
+
         localStorage.setItem('apexwire_admin_token', data.session.access_token);
-        localStorage.setItem('apexwire_admin_email', data.user.email || cleanEmail);
+        localStorage.setItem('apexwire_admin_email', userEmail);
         window.dispatchEvent(
           new CustomEvent('apexwire_auth_change', {
             detail: { event: 'SIGNED_IN', session: data.session }
@@ -191,8 +227,15 @@ export const performAdminLogin = async (
     const data = await res.json();
 
     if (res.ok && data.session && data.user) {
+      const userEmail = data.user.email || cleanEmail;
+      if (!isAuthorizedAdmin(userEmail)) {
+        return {
+          success: false,
+          error: `Access Blocked: Account "${userEmail}" is not authorized. Access is strictly restricted to authorized administrators.`
+        };
+      }
       localStorage.setItem('apexwire_admin_token', data.session.access_token);
-      localStorage.setItem('apexwire_admin_email', data.user.email || cleanEmail);
+      localStorage.setItem('apexwire_admin_email', userEmail);
       window.dispatchEvent(
         new CustomEvent('apexwire_auth_change', {
           detail: { event: 'SIGNED_IN', session: data.session }

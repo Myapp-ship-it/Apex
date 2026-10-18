@@ -36,6 +36,8 @@ CREATE TABLE IF NOT EXISTS public.posts (
   title TEXT NOT NULL,
   category TEXT DEFAULT 'Headphones',
   price TEXT,
+  buy_now_link TEXT,
+  affiliate_link TEXT,
   content TEXT NOT NULL,
   image_url TEXT,
   author_email TEXT,
@@ -43,10 +45,12 @@ CREATE TABLE IF NOT EXISTS public.posts (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Quick migration if table already exists:
+-- Quick migration if table already exists (adds affiliate_link and other columns):
 ALTER TABLE public.posts
 ADD COLUMN IF NOT EXISTS price TEXT,
-ADD COLUMN IF NOT EXISTS category TEXT;
+ADD COLUMN IF NOT EXISTS category TEXT,
+ADD COLUMN IF NOT EXISTS buy_now_link TEXT,
+ADD COLUMN IF NOT EXISTS affiliate_link TEXT;
 
 -- 4. Enable Row Level Security (RLS) on both tables
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
@@ -248,20 +252,30 @@ ON CONFLICT (id) DO UPDATE SET
 
 -- 9. Seed Initial Post Data
 INSERT INTO public.posts (
-  id, title, content, image_url, author_email
+  id, title, category, price, buy_now_link, content, image_url, author_email
 ) VALUES
 (
   '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d',
   'The 2026 Noise-Cancelling Showdown: Which Headset Reigns Supreme?',
+  'Headphones',
+  '$349.99',
+  'https://www.amazon.com/dp/B0AFF123?tag=apexwire-20',
   'After testing over a dozen top wireless headphones across airplanes, subways, and bustling coworking spaces, we broke down how active noise cancellation algorithms handle low-frequency rumble vs high-frequency vocal chatter. Here is our conclusive lab verdict for traveling professionals.',
   '/src/assets/images/hero_curated_workspace_1792241538519.jpg',
-  'editor@apexwire.internal'
+  'Editorial Team'
 ),
 (
   'e6c2f5d1-41b9-4a92-9a3d-4c748bb22d1e',
   'Ergonomic Workstation Setup: How to Eliminate Back Fatigue in 5 Steps',
+  'Desk Ergonomics',
+  '$649.00',
+  'https://ergoluxedesign.com/chairs/kinetix?ref=apexwire',
   'Desk ergonomics is more than buying an expensive chair. In this comprehensive guide, our certified ergonomics specialists explain optimal lumbar tilt angles, keyboard wrist declination, and monitor height positioning to keep your spine healthy during 8-hour sessions.',
   '/src/assets/images/product_ergonomic_chair_1792241540323.jpg',
-  'wellness@apexwire.internal'
+  'Editorial Team'
 )
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (id) DO UPDATE SET
+  category = EXCLUDED.category,
+  price = EXCLUDED.price,
+  buy_now_link = EXCLUDED.buy_now_link,
+  author_email = 'Editorial Team';

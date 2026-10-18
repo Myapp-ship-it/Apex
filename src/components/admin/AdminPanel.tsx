@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { EditProductModal } from './EditProductModal';
 import { NewPostModal } from './NewPostModal';
+import { EditPostModal } from './EditPostModal';
 import { getSupabaseClient } from '../../lib/supabaseClient';
 
 interface AdminPanelProps {
@@ -47,6 +48,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [posts, setPosts] = useState<any[]>([]);
   const [loadingPosts, setLoadingPosts] = useState(false);
   const [isNewPostOpen, setIsNewPostOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<any | null>(null);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
 
   // Status & SQL state
@@ -58,7 +60,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       const res = await fetch('/api/admin/status', {
         headers: {
-          Authorization: `Bearer ${authToken || 'demo-admin-token'}`
+          Authorization: `Bearer ${authToken || ''}`
         }
       });
       const data = await res.json();
@@ -75,7 +77,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       const res = await fetch('/api/admin/products', {
         headers: {
-          Authorization: `Bearer ${authToken || 'demo-admin-token'}`
+          Authorization: `Bearer ${authToken || ''}`
         }
       });
       if (res.ok) {
@@ -114,7 +116,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     try {
       const res = await fetch('/api/admin/posts', {
         headers: {
-          Authorization: `Bearer ${authToken || 'demo-admin-token'}`
+          Authorization: `Bearer ${authToken || ''}`
         }
       });
       if (res.ok) {
@@ -167,6 +169,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     setTimeout(() => setMessage(null), 4000);
   };
 
+  const handlePostSaved = (updated: any) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p))
+    );
+    setMessage({ text: `Successfully updated post "${updated.title}" in Supabase!`, type: 'success' });
+    setTimeout(() => setMessage(null), 4000);
+    onProductUpdatedInApp?.();
+  };
+
   const handleDeletePost = async (id: string) => {
     if (!confirm('Are you sure you want to delete this post from the Supabase database?')) {
       return;
@@ -179,7 +190,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       const res = await fetch(`/api/admin/posts/${id}`, {
         method: 'DELETE',
         headers: {
-          Authorization: `Bearer ${authToken || 'demo-admin-token'}`
+          Authorization: `Bearer ${authToken || ''}`
         }
       });
       if (res.ok) {
@@ -247,12 +258,14 @@ CREATE TABLE IF NOT EXISTS public.products (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Posts Table (with Price and Category)
+-- Posts Table (with Price, Category, and Affiliate Link)
 CREATE TABLE IF NOT EXISTS public.posts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title TEXT NOT NULL,
   category TEXT DEFAULT 'Headphones',
   price TEXT,
+  buy_now_link TEXT,
+  affiliate_link TEXT,
   content TEXT NOT NULL,
   image_url TEXT,
   author_email TEXT,
@@ -260,10 +273,12 @@ CREATE TABLE IF NOT EXISTS public.posts (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- If posts table already exists, run this to add the new columns:
+-- If posts table already exists, run this to add the affiliate_link column:
 ALTER TABLE public.posts
 ADD COLUMN IF NOT EXISTS price TEXT,
-ADD COLUMN IF NOT EXISTS category TEXT;
+ADD COLUMN IF NOT EXISTS category TEXT,
+ADD COLUMN IF NOT EXISTS buy_now_link TEXT,
+ADD COLUMN IF NOT EXISTS affiliate_link TEXT;
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.posts ENABLE ROW LEVEL SECURITY;
 
@@ -574,7 +589,7 @@ CREATE POLICY "Allow authenticated admin delete posts"
                             )}
                             <span>{new Date(post.created_at).toLocaleDateString()}</span>
                             <span>·</span>
-                            <span className="truncate max-w-[120px]">{post.author_email}</span>
+                            <span className="text-neutral-400">Editorial Team</span>
                           </div>
                           {post.price && (
                             <span className="font-mono text-xs font-bold text-white bg-neutral-900 border border-neutral-700 px-2 py-0.5 rounded">
@@ -589,16 +604,39 @@ CREATE POLICY "Allow authenticated admin delete posts"
                       </div>
                     </div>
 
-                    <div className="pt-3 border-t border-neutral-800/80 flex items-center justify-between">
-                      <span className="text-[11px] text-neutral-500 font-mono">ID: {post.id.slice(0, 8)}...</span>
-                      <button
-                        onClick={() => handleDeletePost(post.id)}
-                        disabled={deletingPostId === post.id}
-                        className="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>{deletingPostId === post.id ? 'Deleting...' : 'Delete Post'}</span>
-                      </button>
+                    <div className="pt-3 border-t border-neutral-800/80 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-[11px] text-neutral-500 font-mono">ID: {post.id.slice(0, 8)}...</span>
+                        {(post.affiliate_link || post.buy_now_link) && (
+                          <a
+                            href={post.affiliate_link || post.buy_now_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[11px] text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-0.5"
+                            title="Open affiliate link in new tab"
+                          >
+                            <span>Link</span>
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </a>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setEditingPost(post)}
+                          className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                          <span>Edit</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeletePost(post.id)}
+                          disabled={deletingPostId === post.id}
+                          className="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900 border border-rose-800 text-rose-300 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>{deletingPostId === post.id ? 'Deleting...' : 'Delete'}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -699,6 +737,15 @@ CREATE POLICY "Allow authenticated admin delete posts"
         isOpen={isNewPostOpen}
         onClose={() => setIsNewPostOpen(false)}
         onPostCreated={handlePostCreated}
+        authToken={authToken}
+      />
+
+      {/* Edit Post Modal */}
+      <EditPostModal
+        isOpen={Boolean(editingPost)}
+        onClose={() => setEditingPost(null)}
+        post={editingPost}
+        onPostSaved={handlePostSaved}
         authToken={authToken}
       />
     </div>

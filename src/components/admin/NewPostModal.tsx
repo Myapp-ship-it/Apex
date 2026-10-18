@@ -27,6 +27,7 @@ export const NewPostModal: React.FC<NewPostModalProps> = ({
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState<string>('Headphones');
   const [price, setPrice] = useState('');
+  const [affiliateLink, setAffiliateLink] = useState('');
   const [content, setContent] = useState('');
   const [imageUrl, setImageUrl] = useState('/src/assets/images/hero_curated_workspace_1792241538519.jpg');
   const [saving, setSaving] = useState(false);
@@ -48,13 +49,16 @@ export const NewPostModal: React.FC<NewPostModalProps> = ({
     setSaving(true);
     setError(null);
 
-    const newPostPayload = {
+    const cleanLink = affiliateLink.trim();
+    const newPostPayload: any = {
       title: title.trim(),
       category: category.trim(),
       price: price.trim(),
+      affiliate_link: cleanLink,
+      buy_now_link: cleanLink,
       content: content.trim(),
       image_url: imageUrl.trim(),
-      author_email: localStorage.getItem('apexwire_admin_email') || 'admin@apexwire.internal',
+      author_email: 'Editorial Team',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -88,11 +92,24 @@ export const NewPostModal: React.FC<NewPostModalProps> = ({
       if (!createdPost) {
         const sb = getSupabaseClient();
         if (sb) {
-          const { data, error: sbError } = await sb
+          let insertData = { ...newPostPayload };
+          let { data, error: sbError } = await sb
             .from('posts')
-            .insert([newPostPayload])
+            .insert([insertData])
             .select()
             .single();
+
+          // Resilient fallback: if the database hasn't added affiliate_link yet or only has buy_now_link
+          if (sbError && sbError.message && (sbError.message.includes('affiliate_link') || sbError.message.includes('buy_now_link'))) {
+            if (sbError.message.includes('affiliate_link')) {
+              delete insertData.affiliate_link;
+            } else {
+              delete insertData.buy_now_link;
+            }
+            const retry = await sb.from('posts').insert([insertData]).select().single();
+            data = retry.data;
+            sbError = retry.error;
+          }
 
           if (!sbError && data) {
             createdPost = data;
@@ -202,6 +219,28 @@ export const NewPostModal: React.FC<NewPostModalProps> = ({
                   className="w-full px-3 py-2.5 bg-neutral-50 focus:bg-white border border-neutral-300 focus:border-neutral-900 rounded-xl text-xs font-mono text-neutral-900 outline-none transition-all"
                 />
               </div>
+            </div>
+
+            {/* Affiliate / Buy Now Link */}
+            <div className="space-y-1.5 bg-amber-50/70 border border-amber-200/90 p-3.5 rounded-xl">
+              <label className="text-xs font-bold text-neutral-900 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <DollarSign className="w-4 h-4 text-amber-700" />
+                  <span>Affiliate / Buy Now Link *</span>
+                </span>
+                <span className="text-[10px] text-amber-800 font-medium">Saved to affiliate_link column</span>
+              </label>
+              <input
+                type="url"
+                required
+                value={affiliateLink}
+                onChange={(e) => setAffiliateLink(e.target.value)}
+                placeholder="Paste your Daraz, Amazon, or store link (e.g., https://www.daraz.pk/... or https://www.amazon.com/dp/...)"
+                className="w-full px-3 py-2.5 bg-white border border-neutral-300 focus:border-neutral-900 rounded-lg text-xs font-mono text-neutral-900 outline-none transition-all shadow-2xs"
+              />
+              <p className="text-[11px] text-neutral-600">
+                Paste your dynamic affiliate link here. Readers clicking <strong>Buy Now</strong> on the review will be directed to this link.
+              </p>
             </div>
 
             {/* Image URL with preset selection */}

@@ -5,25 +5,34 @@ import {
   performAdminLogin,
   setupAuthStateListener,
   saveCustomSupabaseKeys,
-  loadPublicConfig
+  loadPublicConfig,
+  isAuthorizedAdmin
 } from '../../lib/supabaseClient';
 
 interface AdminLoginModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (email: string, token: string) => void;
+  initialError?: string | null;
 }
 
 export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   isOpen,
   onClose,
-  onLoginSuccess
+  onLoginSuccess,
+  initialError
 }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError || null);
   const [helpTip, setHelpTip] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (initialError) {
+      setError(initialError);
+    }
+  }, [initialError]);
 
   // Advanced Key config drawer
   const [showKeyConfig, setShowKeyConfig] = useState(false);
@@ -36,12 +45,18 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    // Listen for Supabase onAuthStateChange
+    // Listen for Supabase onAuthStateChange - ONLY log in if valid active session AND authorized email
     const unsubscribe = setupAuthStateListener((event, session) => {
-      if (session && session.user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
-        console.log('[onAuthStateChange] Triggering admin redirect for:', session.user.email);
-        onLoginSuccess(session.user.email || email, session.access_token);
-        onClose();
+      if (session && session.user && session.access_token && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED')) {
+        const userEmail = session.user.email || '';
+        if (isAuthorizedAdmin(userEmail)) {
+          console.log('[onAuthStateChange] Authorized admin signed in:', userEmail);
+          onLoginSuccess(userEmail, session.access_token);
+          onClose();
+        } else {
+          console.warn('[onAuthStateChange] Unauthorized user blocked:', userEmail);
+          setError(`Access Blocked: Account "${userEmail}" is not authorized. Access is strictly restricted to authorized administrators.`);
+        }
       }
     });
 
@@ -69,10 +84,27 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
     setError(null);
     setHelpTip(null);
 
+    // Verify email matches admin before proceeding
+    if (!isAuthorizedAdmin(email)) {
+      setError(`Access Blocked: "${email.trim()}" is not an authorized administrator email.`);
+      setLoading(false);
+      return;
+    }
+
     const result = await performAdminLogin(email, password);
 
     if (result.success && result.session && result.user) {
-      onLoginSuccess(result.user.email || email, result.session.access_token);
+      const userEmail = result.user.email || email;
+      if (!isAuthorizedAdmin(userEmail)) {
+        const sb = getSupabaseClient();
+        if (sb) await sb.auth.signOut();
+        localStorage.removeItem('apexwire_admin_token');
+        localStorage.removeItem('apexwire_admin_email');
+        setError(`Access Blocked: Account "${userEmail}" is not authorized. Access is strictly restricted to authorized administrators.`);
+        setLoading(false);
+        return;
+      }
+      onLoginSuccess(userEmail, result.session.access_token);
       onClose();
       return;
     }
@@ -95,14 +127,7 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
     setLoading(false);
   };
 
-  const handleDemoLogin = () => {
-    const demoToken = 'demo-admin-token';
-    const demoEmail = 'admin@apexwire.internal';
-    localStorage.setItem('apexwire_admin_token', demoToken);
-    localStorage.setItem('apexwire_admin_email', demoEmail);
-    onLoginSuccess(demoEmail, demoToken);
-    onClose();
-  };
+
 
   const handleSaveKeys = (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,15 +248,12 @@ export const AdminLoginModal: React.FC<AdminLoginModalProps> = ({
             </button>
           </form>
 
-          {/* Quick Demo Mode for Preview testing */}
+          {/* Authorized Admin Notice */}
           <div className="pt-2 border-t border-neutral-100 flex flex-col gap-2">
-            <button
-              onClick={handleDemoLogin}
-              className="w-full py-2 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-xl text-xs font-medium transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <Server className="w-3.5 h-3.5 text-neutral-500" />
-              <span>Launch Admin Panel (Preview Mode)</span>
-            </button>
+            <div className="p-2.5 bg-neutral-50 rounded-xl border border-neutral-200 flex items-center gap-2 text-[11px] text-neutral-600">
+              <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+              <span>Admin access strictly restricted to <strong className="text-neutral-900 font-medium">authorized administrators</strong></span>
+            </div>
 
             <button
               onClick={() => setShowKeyConfig(!showKeyConfig)}

@@ -169,9 +169,11 @@ let fallbackPosts = [
     title: 'The 2026 Noise-Cancelling Showdown: Which Headset Reigns Supreme?',
     category: 'Headphones',
     price: '$349.99',
-    content: 'After testing over a dozen top wireless headphones across airplanes, subways, and bustling coworking spaces, we broke down how active noise cancellation algorithms handle low-frequency rumble vs high-frequency vocal chatter. Here is our conclusive lab verdict for traveling professionals.',
+    buy_now_link: 'https://www.amazon.com/dp/B0AFF123?tag=apexwire-20',
+    affiliate_link: 'https://www.amazon.com/dp/B0AFF123?tag=apexwire-20',
+    content: 'After testing over a dozen top wireless headphones across airplanes, subways, and bustling coworking spaces, we broke down how active noise cancellation algorithms handle low-frequency rumble vs high-frequency vocal chatter. Here is our conclusive lab verdict for traveling professionals.\n\nKey Takeaways:\n1. Custom 40mm bio-cellulose drivers provide cleaner mid-range and separation.\n2. Hybrid noise-cancelling mics adapt in real time to cabin pressure.\n3. Multipoint switching connects seamlessly across devices.',
     image_url: '/src/assets/images/hero_curated_workspace_1792241538519.jpg',
-    author_email: 'editor@apexwire.internal',
+    author_email: 'editorial@apexwire.internal',
     created_at: new Date().toISOString()
   },
   {
@@ -179,9 +181,11 @@ let fallbackPosts = [
     title: 'Ergonomic Workstation Setup: How to Eliminate Back Fatigue in 5 Steps',
     category: 'Desk Ergonomics',
     price: '$649.00',
-    content: 'Desk ergonomics is more than buying an expensive chair. In this comprehensive guide, our certified ergonomics specialists explain optimal lumbar tilt angles, keyboard wrist declination, and monitor height positioning to keep your spine healthy during 8-hour sessions.',
+    buy_now_link: 'https://ergoluxedesign.com/chairs/kinetix?ref=apexwire',
+    affiliate_link: 'https://ergoluxedesign.com/chairs/kinetix?ref=apexwire',
+    content: 'Desk ergonomics is more than buying an expensive chair. In this comprehensive guide, our certified ergonomics specialists explain optimal lumbar tilt angles, keyboard wrist declination, and monitor height positioning to keep your spine healthy during 8-hour sessions.\n\nOur Top Recommendation:\nAdjust your chair height so elbows rest naturally at 90 degrees without hunching. Pair with an active lumbar support mechanism to alleviate lower back compression.',
     image_url: '/src/assets/images/product_ergonomic_chair_1792241540323.jpg',
-    author_email: 'wellness@apexwire.internal',
+    author_email: 'editorial@apexwire.internal',
     created_at: new Date(Date.now() - 86400000 * 2).toISOString()
   }
 ];
@@ -203,7 +207,14 @@ const requireAdminAuth = async (req: AuthenticatedRequest, res: Response, next: 
 
   const token = authHeader.split(' ')[1];
 
-  // If Supabase is configured, verify the session token with Supabase Auth
+  const authorizedEmails = [
+    (process.env.ADMIN_EMAIL || '').toLowerCase().trim(),
+    (process.env.VITE_ADMIN_EMAIL || '').toLowerCase().trim(),
+    'oyajnabo@gmail.com',
+    '0yyajnabe@gmail.com'
+  ].filter(Boolean);
+
+  // Verify the session token with Supabase Auth
   if (supabaseAdmin) {
     try {
       const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
@@ -214,6 +225,16 @@ const requireAdminAuth = async (req: AuthenticatedRequest, res: Response, next: 
         });
         return;
       }
+
+      const userEmail = (user.email || '').toLowerCase().trim();
+      if (!userEmail || !authorizedEmails.includes(userEmail)) {
+        console.warn(`[Security Alert] Non-admin user (${user.email}) attempted admin API access.`);
+        res.status(403).json({
+          error: `Forbidden: User "${user.email}" is not authorized. Only designated admin emails have administrative permissions.`
+        });
+        return;
+      }
+
       req.user = user;
       next();
       return;
@@ -225,14 +246,8 @@ const requireAdminAuth = async (req: AuthenticatedRequest, res: Response, next: 
       return;
     }
   } else {
-    // If Supabase credentials are not yet saved in .env, accept mock demo admin token for sandbox preview testing
-    if (token === 'demo-admin-token' || token.startsWith('demo-')) {
-      req.user = { id: 'demo-admin', email: 'admin@apexwire.internal' };
-      next();
-      return;
-    }
     res.status(401).json({
-      error: 'Unauthorized: Supabase credentials not configured and token invalid.'
+      error: 'Unauthorized: Supabase server is not configured or session is invalid.'
     });
     return;
   }
@@ -288,7 +303,23 @@ app.post('/api/auth/login', async (req: Request, res: Response) => {
       return;
     }
 
-    console.log('[Supabase Auth] Admin login successful for', data.user.email);
+    const authorizedEmails = [
+      (process.env.ADMIN_EMAIL || '').toLowerCase().trim(),
+      (process.env.VITE_ADMIN_EMAIL || '').toLowerCase().trim(),
+      'oyajnabo@gmail.com',
+      '0yyajnabe@gmail.com'
+    ].filter(Boolean);
+
+    const userEmail = (data.user.email || '').toLowerCase().trim();
+    if (!userEmail || !authorizedEmails.includes(userEmail)) {
+      console.warn(`[Security Alert] Non-admin user (${data.user.email}) attempted login.`);
+      res.status(403).json({
+        error: `Access Denied: Account "${data.user.email}" does not have administrator privileges. Only authorized admin emails have access.`
+      });
+      return;
+    }
+
+    console.log('[Supabase Auth] Admin login successful for authorized admin:', data.user.email);
     res.json({
       session: data.session,
       user: data.user
@@ -321,6 +352,17 @@ app.get('/api/public/products', async (_req: Request, res: Response) => {
   res.json({ products: fallbackProducts, source: 'fallback' });
 });
 
+// Helper to ensure both affiliate_link and buy_now_link are synchronized
+const normalizePost = (p: any) => {
+  if (!p) return p;
+  const link = p.affiliate_link || p.buy_now_link || '';
+  return {
+    ...p,
+    affiliate_link: link,
+    buy_now_link: link
+  };
+};
+
 // Public: Get all posts
 app.get('/api/public/posts', async (_req: Request, res: Response) => {
   if (supabaseAdmin) {
@@ -331,14 +373,42 @@ app.get('/api/public/posts', async (_req: Request, res: Response) => {
         .order('created_at', { ascending: false });
 
       if (!error && data && data.length > 0) {
-        res.json({ posts: data, source: 'supabase' });
+        res.json({ posts: data.map(normalizePost), source: 'supabase' });
         return;
       }
     } catch (err) {
       console.error('[API] Error fetching posts from Supabase, using fallback:', err);
     }
   }
-  res.json({ posts: fallbackPosts, source: 'fallback' });
+  res.json({ posts: fallbackPosts.map(normalizePost), source: 'fallback' });
+});
+
+// Public: Get single post by id
+app.get('/api/public/posts/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  if (supabaseAdmin) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('posts')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (!error && data) {
+        res.json({ post: normalizePost(data), source: 'supabase' });
+        return;
+      }
+    } catch (err) {
+      console.error('[API] Error fetching post by id from Supabase:', err);
+    }
+  }
+
+  const found = fallbackPosts.find((p) => p.id === id);
+  if (found) {
+    res.json({ post: normalizePost(found), source: 'fallback' });
+  } else {
+    res.status(404).json({ error: `Post with ID '${id}' not found.` });
+  }
 });
 
 // -----------------------------------------------------------------------------
@@ -472,19 +542,19 @@ app.get('/api/admin/posts', requireAdminAuth, async (_req: AuthenticatedRequest,
         res.status(500).json({ error: error.message });
         return;
       }
-      res.json({ posts: data });
+      res.json({ posts: (data || []).map(normalizePost) });
       return;
     } catch (err: any) {
       res.status(500).json({ error: err.message });
       return;
     }
   }
-  res.json({ posts: fallbackPosts });
+  res.json({ posts: fallbackPosts.map(normalizePost) });
 });
 
 // Admin: Add new post
 app.post('/api/admin/posts', requireAdminAuth, async (req: AuthenticatedRequest, res: Response) => {
-  const { title, content, image_url, price, category } = req.body;
+  const { title, content, image_url, price, category, buy_now_link, affiliate_link } = req.body;
 
   if (!title || !content) {
     res.status(400).json({ error: 'Title and content are required.' });
@@ -496,30 +566,46 @@ app.post('/api/admin/posts', requireAdminAuth, async (req: AuthenticatedRequest,
     return;
   }
 
-  const newPostData = {
+  const rawLink = (affiliate_link || buy_now_link || 'https://www.amazon.com/dp/B0AFF123?tag=apexwire-20').toString().trim();
+  const newPostData: any = {
     title,
     content,
     price: String(price),
     category: category || 'Headphones',
+    buy_now_link: rawLink,
+    affiliate_link: rawLink,
     image_url: image_url || '/src/assets/images/hero_curated_workspace_1792241538519.jpg',
-    author_email: req.user?.email || 'admin@apexwire.internal',
+    author_email: 'Editorial Team',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
 
   if (supabaseAdmin) {
     try {
-      const { data, error } = await supabaseAdmin
+      let insertPayload = { ...newPostData };
+      let { data, error } = await supabaseAdmin
         .from('posts')
-        .insert([newPostData])
+        .insert([insertPayload])
         .select()
         .single();
+
+      // Graceful fallback if database schema has only buy_now_link or only affiliate_link
+      if (error && error.message && (error.message.includes('affiliate_link') || error.message.includes('buy_now_link'))) {
+        if (error.message.includes('affiliate_link')) {
+          delete insertPayload.affiliate_link;
+        } else {
+          delete insertPayload.buy_now_link;
+        }
+        const retry = await supabaseAdmin.from('posts').insert([insertPayload]).select().single();
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (error) {
         res.status(500).json({ error: error.message });
         return;
       }
-      res.status(201).json({ success: true, post: data });
+      res.status(201).json({ success: true, post: normalizePost(data) });
       return;
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -533,7 +619,68 @@ app.post('/api/admin/posts', requireAdminAuth, async (req: AuthenticatedRequest,
     ...newPostData
   };
   fallbackPosts.unshift(createdFallback);
-  res.status(201).json({ success: true, post: createdFallback });
+  res.status(201).json({ success: true, post: normalizePost(createdFallback) });
+});
+
+// Admin: Update post
+app.put('/api/admin/posts/:id', requireAdminAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const { id } = req.params;
+  const { title, content, price, category, buy_now_link, affiliate_link, image_url } = req.body;
+
+  const updateData: any = {
+    updated_at: new Date().toISOString()
+  };
+  if (title !== undefined) updateData.title = String(title).trim();
+  if (content !== undefined) updateData.content = String(content).trim();
+  if (price !== undefined) updateData.price = String(price).trim();
+  if (category !== undefined) updateData.category = String(category).trim();
+  const link = affiliate_link !== undefined ? affiliate_link : buy_now_link;
+  if (link !== undefined) {
+    updateData.buy_now_link = String(link).trim();
+    updateData.affiliate_link = String(link).trim();
+  }
+  if (image_url !== undefined) updateData.image_url = String(image_url).trim();
+
+  if (supabaseAdmin) {
+    try {
+      let updatePayload = { ...updateData };
+      let { data, error } = await supabaseAdmin
+        .from('posts')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error && error.message && (error.message.includes('affiliate_link') || error.message.includes('buy_now_link'))) {
+        if (error.message.includes('affiliate_link')) {
+          delete updatePayload.affiliate_link;
+        } else {
+          delete updatePayload.buy_now_link;
+        }
+        const retry = await supabaseAdmin.from('posts').update(updatePayload).eq('id', id).select().single();
+        data = retry.data;
+        error = retry.error;
+      }
+
+      if (error) {
+        res.status(500).json({ error: error.message });
+        return;
+      }
+      res.json({ success: true, post: normalizePost(data) });
+      return;
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+      return;
+    }
+  }
+
+  const idx = fallbackPosts.findIndex((p) => p.id === id);
+  if (idx !== -1) {
+    fallbackPosts[idx] = { ...fallbackPosts[idx], ...updateData };
+    res.json({ success: true, post: normalizePost(fallbackPosts[idx]) });
+  } else {
+    res.status(404).json({ error: `Post with ID '${id}' not found.` });
+  }
 });
 
 // Admin: Delete post
