@@ -13,7 +13,8 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // Server-side Supabase configuration
 // Using NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL
@@ -708,6 +709,61 @@ app.delete('/api/admin/posts/:id', requireAdminAuth, async (req: AuthenticatedRe
 
   fallbackPosts = fallbackPosts.filter((p) => p.id !== id);
   res.json({ success: true, deletedId: id });
+});
+
+// Admin: Upload image to Supabase Storage ('post-images' bucket)
+app.post('/api/admin/upload-image', requireAdminAuth, async (req: AuthenticatedRequest, res: Response) => {
+  const { fileName, fileType, base64 } = req.body;
+
+  if (!base64 || !fileName) {
+    res.status(400).json({ error: 'Image data and fileName are required.' });
+    return;
+  }
+
+  if (supabaseAdmin) {
+    try {
+      // Ensure 'post-images' bucket exists and is public
+      try {
+        await supabaseAdmin.storage.createBucket('post-images', { public: true });
+      } catch (bucketErr) {
+        // Bucket may already exist
+      }
+
+      const cleanBase64 = base64.replace(/^data:image\/\w+;base64,/, '');
+      const buffer = Buffer.from(cleanBase64, 'base64');
+      const fileExt = fileName.split('.').pop() || 'jpg';
+      const cleanName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+      const filePath = `posts/${cleanName}`;
+
+      const { data, error } = await supabaseAdmin.storage
+        .from('post-images')
+        .upload(filePath, buffer, {
+          contentType: fileType || 'image/jpeg',
+          upsert: true
+        });
+
+      if (error) {
+        console.error('[Supabase Storage Server] Upload error:', error);
+        res.status(500).json({ error: error.message });
+        return;
+      }
+
+      const { data: { publicUrl } } = supabaseAdmin.storage
+        .from('post-images')
+        .getPublicUrl(filePath);
+
+      console.log('[Supabase Storage Server] Uploaded image successfully:', publicUrl);
+      res.json({ success: true, publicUrl, filePath });
+      return;
+    } catch (err: any) {
+      console.error('[Supabase Storage Server] Exception during image upload:', err);
+      res.status(500).json({ error: err.message || 'Image upload failed.' });
+      return;
+    }
+  }
+
+  // Fallback for preview mode
+  res.json({ success: true, publicUrl: base64, filePath: fileName });
 });
 
 // Mount Vite middleware for dev or serve dist in production

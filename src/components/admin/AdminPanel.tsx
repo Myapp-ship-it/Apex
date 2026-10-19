@@ -306,7 +306,39 @@ CREATE POLICY "Allow authenticated admin update posts"
   ON public.posts FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 
 CREATE POLICY "Allow authenticated admin delete posts"
-  ON public.posts FOR DELETE TO authenticated USING (true);`;
+  ON public.posts FOR DELETE TO authenticated USING (true);
+
+-- =========================================================
+-- Supabase Storage Bucket Setup: 'post-images'
+-- =========================================================
+-- 1. Create the public storage bucket for images
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('post-images', 'post-images', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+-- 2. Allow public read access to view uploaded images
+CREATE POLICY "Public Read post-images"
+  ON storage.objects FOR SELECT
+  TO public
+  USING (bucket_id = 'post-images');
+
+-- 3. Allow authenticated users (admin) to upload images
+CREATE POLICY "Admin Insert post-images"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (bucket_id = 'post-images');
+
+-- 4. Allow authenticated users to update/replace images
+CREATE POLICY "Admin Update post-images"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  USING (bucket_id = 'post-images');
+
+-- 5. Allow authenticated users to delete images
+CREATE POLICY "Admin Delete post-images"
+  ON storage.objects FOR DELETE
+  TO authenticated
+  USING (bucket_id = 'post-images');`;
 
   const copySql = () => {
     navigator.clipboard.writeText(sqlStatements);

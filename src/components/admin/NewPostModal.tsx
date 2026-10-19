@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { X, Plus, Image as ImageIcon, FileText, AlertCircle, DollarSign, Tag } from 'lucide-react';
+import { X, Plus, FileText, AlertCircle, DollarSign, Tag } from 'lucide-react';
 import { getSupabaseClient } from '../../lib/supabaseClient';
+import { ImageUploader } from './ImageUploader';
 
 interface NewPostModalProps {
   isOpen: boolean;
@@ -10,6 +11,9 @@ interface NewPostModalProps {
 }
 
 export const POST_CATEGORIES = [
+  'Electronics',
+  'Mobile',
+  'Mobile Accessories',
   'Headphones',
   'Audio Acoustics',
   'Desk Ergonomics',
@@ -25,7 +29,7 @@ export const NewPostModal: React.FC<NewPostModalProps> = ({
   authToken
 }) => {
   const [title, setTitle] = useState('');
-  const [category, setCategory] = useState<string>('Headphones');
+  const [category, setCategory] = useState<string>('Electronics');
   const [price, setPrice] = useState('');
   const [affiliateLink, setAffiliateLink] = useState('');
   const [content, setContent] = useState('');
@@ -243,22 +247,17 @@ export const NewPostModal: React.FC<NewPostModalProps> = ({
               </p>
             </div>
 
-            {/* Image URL with preset selection */}
+            {/* Image Upload using Supabase Storage */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-neutral-800 flex items-center gap-1.5">
-                <ImageIcon className="w-3.5 h-3.5 text-neutral-500" />
-                <span>Featured Image URL *</span>
-              </label>
-              <input
-                type="text"
-                required
+              <ImageUploader
                 value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://... or /src/assets/images/..."
-                className="w-full px-3 py-2 bg-neutral-50 focus:bg-white border border-neutral-300 focus:border-neutral-900 rounded-xl text-xs font-mono text-neutral-900 outline-none"
+                onChange={setImageUrl}
+                authToken={authToken}
+                label="Featured Image (Upload from Computer)"
+                required
               />
-              <div className="flex flex-wrap gap-1.5 pt-1">
-                <span className="text-[10px] text-neutral-500 self-center">Presets:</span>
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="text-[10px] text-neutral-500">Presets:</span>
                 {presetImages.map((img) => (
                   <button
                     key={img.label}

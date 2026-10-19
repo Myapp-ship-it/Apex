@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, Image as ImageIcon, FileText, AlertCircle, DollarSign, Tag, ExternalLink } from 'lucide-react';
+import { X, Check, FileText, AlertCircle, DollarSign, Tag, ExternalLink } from 'lucide-react';
 import { getSupabaseClient } from '../../lib/supabaseClient';
 import { POST_CATEGORIES } from './NewPostModal';
+import { ImageUploader } from './ImageUploader';
 
 interface EditPostModalProps {
   isOpen: boolean;
@@ -183,6 +184,9 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
                       {cat}
                     </option>
                   ))}
+                  {category && !(POST_CATEGORIES as readonly string[]).includes(category) && (
+                    <option value={category}>{category}</option>
+                  )}
                 </select>
               </div>
 
@@ -224,18 +228,14 @@ export const EditPostModal: React.FC<EditPostModalProps> = ({
               </p>
             </div>
 
-            {/* Featured Image */}
+            {/* Featured Image Upload with Supabase Storage */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-neutral-800 flex items-center gap-1.5">
-                <ImageIcon className="w-3.5 h-3.5 text-neutral-500" />
-                <span>Featured Image URL *</span>
-              </label>
-              <input
-                type="text"
-                required
+              <ImageUploader
                 value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                className="w-full px-3 py-2 bg-neutral-50 focus:bg-white border border-neutral-300 focus:border-neutral-900 rounded-xl text-xs font-mono text-neutral-900 outline-none"
+                onChange={setImageUrl}
+                authToken={authToken}
+                label="Featured Image (Upload from Computer)"
+                required
               />
             </div>
 
