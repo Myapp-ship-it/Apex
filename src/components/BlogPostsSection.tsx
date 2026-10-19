@@ -1,6 +1,7 @@
 import React from 'react';
 import { Newspaper, Calendar, ArrowRight, ShoppingBag, ExternalLink, ShieldCheck } from 'lucide-react';
 import { BlogPost } from './SinglePostPage';
+import { formatSafeImageUrl, handleImageError } from '../lib/imageUtils';
 
 interface BlogPostsSectionProps {
   posts: BlogPost[];
@@ -48,6 +49,13 @@ export const BlogPostsSection: React.FC<BlogPostsSectionProps> = ({
               ? rawLink
               : 'https://www.amazon.com/dp/B0AFF123?tag=apexwire-20';
 
+            const postImageUrl = formatSafeImageUrl(
+              post.image_url ||
+              (post as any).image ||
+              (post as any).imageUrl ||
+              'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=1200&q=80'
+            );
+
             const handleCardClick = () => {
               if (typeof onOpenPost === 'function') {
                 onOpenPost(post);
@@ -69,22 +77,23 @@ export const BlogPostsSection: React.FC<BlogPostsSectionProps> = ({
               >
                 <div className="space-y-4">
                   {/* Thumbnail (Clickable) */}
-                  {post.image_url && (
-                    <div className="aspect-16/9 rounded-xl overflow-hidden bg-neutral-200 border border-neutral-200 relative">
-                      <img
-                        src={post.image_url}
-                        alt={post.title}
-                        referrerPolicy="no-referrer"
-                        className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500 ease-out"
-                        loading="lazy"
-                      />
-                      {post.category && (
-                        <div className="absolute top-3 left-3 bg-neutral-900/90 backdrop-blur-xs text-white text-[11px] font-semibold px-2.5 py-1 rounded shadow-xs">
-                          {post.category}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                  <div className="aspect-16/9 rounded-xl overflow-hidden bg-neutral-200 border border-neutral-200 relative">
+                    <img
+                      src={postImageUrl}
+                      alt={post.title}
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        handleImageError(e, 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=1200&q=80');
+                      }}
+                      className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500 ease-out"
+                      loading="lazy"
+                    />
+                    {post.category && (
+                      <div className="absolute top-3 left-3 bg-neutral-900/90 backdrop-blur-xs text-white text-[11px] font-semibold px-2.5 py-1 rounded shadow-xs">
+                        {post.category}
+                      </div>
+                    )}
+                  </div>
 
                   <div className="space-y-2.5">
                     {/* Unboxed Metadata & Price Header */}

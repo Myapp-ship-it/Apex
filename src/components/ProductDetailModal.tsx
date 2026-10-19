@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Star, Bookmark, Scale, Check, ShoppingBag, ExternalLink, ShieldCheck, Copy, Clock, Layers } from 'lucide-react';
 import { Product } from '../data/products';
+import { formatSafeImageUrl, handleImageError } from '../lib/imageUtils';
 
 interface ProductDetailModalProps {
   product: Product | null;
@@ -90,9 +91,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             {/* Image */}
             <div className="md:col-span-5 relative rounded-xl overflow-hidden bg-neutral-100 border border-neutral-200 aspect-4/3 md:aspect-square">
               <img
-                src={product.image}
+                src={formatSafeImageUrl((product as any).image_url || product.image || (product as any).imageUrl)}
                 alt={product.title}
                 referrerPolicy="no-referrer"
+                onError={handleImageError}
                 className="w-full h-full object-cover"
               />
               {product.awardLabel && (
@@ -155,7 +157,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     className="w-full py-3 px-4 bg-neutral-900 hover:bg-neutral-800 text-white rounded-xl font-semibold text-sm transition-all shadow flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                   >
                     <ShoppingBag className="w-4 h-4" />
-                    <span>Get Best Affiliate Deal Now</span>
+                    <span>Buy Now</span>
                   </button>
                 </div>
               </div>

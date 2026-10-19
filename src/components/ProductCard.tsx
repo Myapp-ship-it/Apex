@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Star, Bookmark, Scale, ExternalLink, ArrowRight, Check, ShoppingBag, ShieldCheck } from 'lucide-react';
 import { Product } from '../data/products';
+import { formatSafeImageUrl, handleImageError } from '../lib/imageUtils';
 
 interface ProductCardProps {
   product: Product;
@@ -27,6 +28,13 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const discountPercent = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
   const lowestAffiliate = product.affiliateLinks.find(l => l.isLowestPrice) || product.affiliateLinks[0];
 
+  const cardImage = formatSafeImageUrl(
+    (product as any).image_url ||
+    product.image ||
+    (product as any).imageUrl ||
+    'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=1200&q=80'
+  );
+
   if (viewMode === 'list') {
     return (
       <article className="bg-white border border-neutral-200/90 rounded-2xl p-5 hover:border-neutral-300 transition-all shadow-xs hover:shadow-md flex flex-col md:flex-row gap-6 items-stretch">
@@ -35,21 +43,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           onClick={() => onOpenDetail(product)}
           className="relative w-full md:w-56 h-48 md:h-auto shrink-0 bg-neutral-100 rounded-xl overflow-hidden cursor-pointer group"
         >
-          {!imageError ? (
-            <img
-              src={product.image}
-              alt={product.title}
-              referrerPolicy="no-referrer"
-              onError={() => setImageError(true)}
-              className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-300"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-neutral-100 text-neutral-400">
-              <ShoppingBag className="w-8 h-8 mb-2" />
-              <span className="text-xs font-medium text-neutral-500">{product.brand}</span>
-            </div>
-          )}
+          <img
+            src={cardImage}
+            alt={product.title}
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              handleImageError(e);
+            }}
+            className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-300"
+            loading="lazy"
+          />
 
           {product.awardLabel && (
             <div className="absolute top-2.5 left-2.5 bg-neutral-900/90 backdrop-blur-xs text-white text-[11px] font-semibold px-2 py-0.5 rounded">
@@ -176,21 +179,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           onClick={() => onOpenDetail(product)}
           className="relative aspect-4/3 w-full bg-neutral-100 overflow-hidden cursor-pointer"
         >
-          {!imageError ? (
-            <img
-              src={product.image}
-              alt={product.title}
-              referrerPolicy="no-referrer"
-              onError={() => setImageError(true)}
-              className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-500 ease-out"
-              loading="lazy"
-            />
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center p-6 bg-neutral-100 text-neutral-400">
-              <ShoppingBag className="w-10 h-10 mb-2 stroke-1" />
-              <span className="text-xs font-medium text-neutral-600">{product.brand}</span>
-            </div>
-          )}
+          <img
+            src={cardImage}
+            alt={product.title}
+            referrerPolicy="no-referrer"
+            onError={(e) => {
+              handleImageError(e);
+            }}
+            className="w-full h-full object-cover group-hover:scale-104 transition-transform duration-500 ease-out"
+            loading="lazy"
+          />
 
           {/* Award Tag */}
           {product.awardLabel && (

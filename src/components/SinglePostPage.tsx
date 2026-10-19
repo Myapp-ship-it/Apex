@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowLeft, Calendar, ShoppingBag, ExternalLink, ShieldCheck, Share2, Check } from 'lucide-react';
+import { formatSafeImageUrl, handleImageError } from '../lib/imageUtils';
 
 export interface BlogPost {
   id: string;
@@ -167,12 +168,15 @@ export const SinglePostPage: React.FC<SinglePostPageProps> = ({ post, onBack, on
         </header>
 
         {/* Featured Image */}
-        {post.image_url && (
+        {(post.image_url || (post as any).image) && (
           <div className="rounded-2xl overflow-hidden border border-neutral-200/80 bg-neutral-100 aspect-16/9 shadow-sm">
             <img
-              src={post.image_url}
+              src={formatSafeImageUrl(post.image_url || (post as any).image || (post as any).imageUrl)}
               alt={post.title}
               referrerPolicy="no-referrer"
+              onError={(e) => {
+                handleImageError(e, 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=1200&q=80');
+              }}
               className="w-full h-full object-cover"
             />
           </div>

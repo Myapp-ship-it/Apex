@@ -17,6 +17,7 @@ import { AdminLoginModal } from './components/admin/AdminLoginModal';
 import { AdminPanel } from './components/admin/AdminPanel';
 import { Search, RotateCcw, Scale, Bookmark, Lock, Key, AlertCircle, ShieldCheck } from 'lucide-react';
 import { getSupabaseClient, setupAuthStateListener, isAuthorizedAdmin } from './lib/supabaseClient';
+import { formatSafeImageUrl } from './lib/imageUtils';
 
 const STORAGE_SAVED_KEY = 'apexwire_saved_product_ids_v1';
 
@@ -327,7 +328,12 @@ export default function App() {
       if (resPosts.ok) {
         const dataPosts = await resPosts.json();
         if (dataPosts.posts && dataPosts.posts.length > 0) {
-          setLivePosts(dataPosts.posts);
+          setLivePosts(
+            dataPosts.posts.map((p: any) => ({
+              ...p,
+              image_url: formatSafeImageUrl(p.image_url || p.image || p.imageUrl)
+            }))
+          );
           fetchedPosts = true;
         }
       }
@@ -343,7 +349,14 @@ export default function App() {
           }
           if (!fetchedPosts) {
             const { data: posts } = await sb.from('posts').select('*').order('created_at', { ascending: false });
-            if (posts && posts.length > 0) setLivePosts(posts);
+            if (posts && posts.length > 0) {
+              setLivePosts(
+                posts.map((p: any) => ({
+                  ...p,
+                  image_url: formatSafeImageUrl(p.image_url || p.image || p.imageUrl)
+                }))
+              );
+            }
           }
         }
       }
@@ -355,7 +368,14 @@ export default function App() {
           const { data: prods } = await sb.from('products').select('*').order('rating', { ascending: false });
           if (prods && prods.length > 0) applyProductsData(prods);
           const { data: posts } = await sb.from('posts').select('*').order('created_at', { ascending: false });
-          if (posts && posts.length > 0) setLivePosts(posts);
+          if (posts && posts.length > 0) {
+            setLivePosts(
+              posts.map((p: any) => ({
+                ...p,
+                image_url: formatSafeImageUrl(p.image_url || p.image || p.imageUrl)
+              }))
+            );
+          }
         }
       } catch (sbErr) {
         console.warn('Using client defaults for products and posts:', sbErr);
@@ -366,6 +386,7 @@ export default function App() {
   const applyProductsData = (rawProducts: any[]) => {
     const mapped = rawProducts.map((sp: any) => {
       const fallback = PRODUCTS.find((p) => p.id === sp.id);
+      const safeImage = formatSafeImageUrl(sp.image_url || sp.image || fallback?.image);
       return {
         id: sp.id,
         title: sp.title || fallback?.title || '',
@@ -376,7 +397,8 @@ export default function App() {
         rating: Number(sp.rating || fallback?.rating || 4.8),
         reviewsCount: Number(sp.reviews_count || sp.reviewsCount || fallback?.reviewsCount || 100),
         awardLabel: sp.award_label || sp.awardLabel || fallback?.awardLabel,
-        image: sp.image_url || sp.image || fallback?.image,
+        image: safeImage,
+        image_url: safeImage,
         shortVerdict: sp.short_verdict || sp.shortVerdict || fallback?.shortVerdict || '',
         fullReview: sp.full_review || sp.fullReview || fallback?.fullReview || '',
         testedHours: Number(sp.tested_hours || sp.testedHours || fallback?.testedHours || 100),
