@@ -554,7 +554,7 @@ CREATE POLICY "Admin Delete post-images"
                               className="px-3 py-1.5 bg-white hover:bg-neutral-200 text-neutral-900 rounded-lg font-semibold text-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
-                              <span>Edit Link</span>
+                              <span>Edit Product</span>
                             </button>
                           </td>
                         </tr>
@@ -655,10 +655,10 @@ CREATE POLICY "Admin Delete post-images"
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => setEditingPost(post)}
-                          className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                          className="px-3.5 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
                         >
-                          <Edit2 className="w-3.5 h-3.5" />
-                          <span>Edit</span>
+                          <Edit2 className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Edit Post</span>
                         </button>
                         <button
                           onClick={() => handleDeletePost(post.id)}
