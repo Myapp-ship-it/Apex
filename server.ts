@@ -784,6 +784,17 @@ app.post('/api/admin/upload-image', requireAdminAuth, async (req: AuthenticatedR
   res.json({ success: true, publicUrl: base64, filePath: fileName });
 });
 
+// Explicit sitemap.xml & robots.txt routes with correct XML/text content types
+app.get('/sitemap.xml', (_req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.sendFile(path.join(__dirname, 'public', 'sitemap.xml'));
+});
+
+app.get('/robots.txt', (_req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.sendFile(path.join(__dirname, 'public', 'robots.txt'));
+});
+
 // Mount Vite middleware for dev or serve dist in production
 async function startServer() {
   const isProduction = process.env.NODE_ENV === 'production';
